@@ -1,0 +1,8 @@
+node_modules/
+*.tsbuildinfo
+.DS_Store
+
+# out/ is intentionally NOT ignored: consumers install this package from a git tag,
+# and wehangul's CI runs `npm ci --ignore-scripts`, which would suppress a `prepare`
+# script. The committed build is what makes a clean install work. CI job
+# `build-freshness` fails if it drifts from src/.
