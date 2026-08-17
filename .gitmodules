@@ -1,0 +1,4 @@
+[submodule "vendor/hwpx2md-spec"]
+	path = vendor/hwpx2md-spec
+	url = https://github.com/mskim/hwpx2md
+	branch = feat/phase-1-ruby-implementation
