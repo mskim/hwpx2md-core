@@ -1,0 +1,38 @@
+name: build-freshness
+
+# out/ is committed (see .gitignore) because consumers install from a git tag and
+# wehangul's CI runs `npm ci --ignore-scripts`, which would suppress a `prepare`
+# script. Committed build output can go stale, so this job recompiles from scratch
+# and fails if the result differs from what is checked in.
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+
+jobs:
+  build-is-current:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run clean && npm run compile
+
+      - name: Committed out/ matches src/
+        run: |
+          # `git diff` inspects TRACKED files only. A newly added source file emits a
+          # NEW, UNTRACKED out/*.js that `git diff` reports as clean — which is exactly
+          # the case this guard exists to catch. `git status --porcelain` sees both.
+          drift="$(git status --porcelain -- out/)"
+          if [ -n "$drift" ]; then
+            echo "$drift"
+            echo "::error::out/ is stale. Run 'npm run clean && npm run compile' and commit the result." >&2
+            exit 1
+          fi

@@ -1,0 +1,58 @@
+name: cross-check
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+
+jobs:
+  cross-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout extension (with submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Apply sparse-checkout to spec submodule
+        run: |
+          git -C vendor/hwpx2md-spec sparse-checkout init --cone
+          git -C vendor/hwpx2md-spec sparse-checkout set spec test/data test/golden
+
+      - name: Determine pinned Ruby gem SHA
+        id: ruby_sha
+        run: |
+          ruby_sha=$(git -C vendor/hwpx2md-spec rev-parse HEAD)
+          echo "ruby_sha=$ruby_sha" >> "$GITHUB_OUTPUT"
+          echo "Ruby gem will be checked out at: $ruby_sha"
+
+      - name: Checkout Ruby gem at the same SHA
+        uses: actions/checkout@v4
+        with:
+          repository: mskim/hwpx2md
+          path: ruby-gem
+          ref: ${{ steps.ruby_sha.outputs.ruby_sha }}
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.1"
+          bundler-cache: true
+          working-directory: ruby-gem
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Run cross-check
+        env:
+          RUBY_REPO_PATH: ${{ github.workspace }}/ruby-gem
+        run: ./scripts/cross-check.sh
