@@ -5,7 +5,23 @@ exports.ImageNode = void 0;
 const xml_1 = require("../ingest/xml");
 /**
  * Wraps an hp:pic element. Resolves a binary-item reference to an asset
- * path and emits `![](images/<basename>)` markdown.
+ * path and emits `![](<sourceBasename>.assets/<sourceBasename>-<binItemId>.<ext>)`.
+ *
+ * NOTE: that is NOT what wehangul's PRD §6.1 ("Images → extracted to `images/`")
+ * and §6.4 ("extracted once to a shared `images/` … Do not duplicate per chapter")
+ * require. An earlier version of this comment claimed `images/`, which read as
+ * "already satisfied". It is not, and five unit tests assert the `images/` form
+ * and fail because of it. M4 must either rewrite references after conversion or
+ * add an `assetsDir` option here — the Ruby gem already takes `assets_dir:`.
+ *
+ * Note also that `Asset.relativePath` (document.ts) is a BARE FILENAME, so a
+ * caller that writes assets at `relativePath` and markdown from `toMarkdown()`
+ * gets a BROKEN LINK. The `<sourceBasename>.assets/` prefix exists only here.
+ * Whatever M4 chooses has to reconcile the two, not just the `images/` path.
+ *
+ * Second-order hazard: the source basename is embedded in both the directory and
+ * each filename, so `내 책.hwpx` yields `내 책.assets/내 책-image1.jpg` — unescaped
+ * Hangul and a space inside a markdown link target.
  *
  * Phase 4 scope (Option C1):
  * - Empty alt text (no caption extraction).
