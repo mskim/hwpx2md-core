@@ -1,0 +1,65 @@
+"use strict";
+/// <reference lib="dom" />
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TextRun = void 0;
+const text_1 = require("../elements/text");
+const xml_1 = require("../ingest/xml");
+const escaper_1 = require("../markdown/escaper");
+const NO_STYLE = { bold: false, italic: false, underline: false, strikethrough: false, supscript: false, subscript: false };
+/**
+ * Wraps an hp:run element. Phase 2 exposed only concatenated text; Phase 4
+ * adds `toMarkdown()` which applies inline Markdown style markers when the
+ * caller passes a charPr lookup table to `from()`.
+ *
+ * Style ordering: if both bold and italic, emit `***text***` (outer triple).
+ * If underline combines with any other style, underline wraps on the outside:
+ *   bold + underline    → `<u>**text**</u>`
+ *   italic + underline  → `<u>*text*</u>`
+ *   all three           → `<u>***text***</u>`
+ *
+ * Styling combinations beyond bold/italic/underline are out of Phase 4 scope.
+ */
+class TextRun {
+    _texts;
+    _style;
+    constructor(_texts, _style) {
+        this._texts = _texts;
+        this._style = _style;
+    }
+    static from(node, charPrTable) {
+        const textNodes = (0, xml_1.findAll)(node, ".//hp:t");
+        const ref = node.getAttribute("charPrIDRef") ?? "";
+        const style = (charPrTable && charPrTable.get(ref)) ?? NO_STYLE;
+        return new TextRun(textNodes.map(t => text_1.Text.from(t)), style);
+    }
+    get text() {
+        return this._texts.map(t => t.content).join("\n");
+    }
+    toMarkdown() {
+        const raw = this.text;
+        if (raw === "")
+            return "";
+        const escaped = (0, escaper_1.escapeInline)(raw);
+        return applyStyles(escaped, this._style);
+    }
+}
+exports.TextRun = TextRun;
+function applyStyles(text, s) {
+    let out = text;
+    if (s.bold && s.italic)
+        out = `***${out}***`;
+    else if (s.bold)
+        out = `**${out}**`;
+    else if (s.italic)
+        out = `*${out}*`;
+    if (s.strikethrough)
+        out = `~~${out}~~`;
+    if (s.supscript)
+        out = `<sup>${out}</sup>`;
+    if (s.subscript)
+        out = `<sub>${out}</sub>`;
+    if (s.underline)
+        out = `<u>${out}</u>`;
+    return out;
+}
+//# sourceMappingURL=text_run.js.map

@@ -1,0 +1,57 @@
+"use strict";
+/// <reference lib="dom" />
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ImageNode = void 0;
+const xml_1 = require("../ingest/xml");
+/**
+ * Wraps an hp:pic element. Resolves a binary-item reference to an asset
+ * path and emits `![](images/<basename>)` markdown.
+ *
+ * Phase 4 scope (Option C1):
+ * - Empty alt text (no caption extraction).
+ * - No width/height attributes.
+ * - Resolves both the current `<hc:img binaryItemIDRef="...">` form and the
+ *   older `<hp:img binItemIDRef="...">` form. Either populates `.binItemId`.
+ */
+class ImageNode {
+    binItemId;
+    href;
+    fixtureBasename;
+    constructor(binItemId, href, fixtureBasename) {
+        this.binItemId = binItemId;
+        this.href = href;
+        this.fixtureBasename = fixtureBasename;
+    }
+    static from(node, binItems, fixtureBasename) {
+        // Use plain descendant XPath then filter in TS, rather than an XPath
+        // attribute predicate (`.//hc:img[@binaryItemIDRef]`) — the xpath
+        // package's predicate support is reliable for simple bracketed
+        // expressions but silently returns zero for unsupported forms, and
+        // filtering explicitly here is diagnosable.
+        const hcImg = (0, xml_1.findAll)(node, ".//hc:img").find(el => el.hasAttribute("binaryItemIDRef"));
+        const hpImg = (0, xml_1.findAll)(node, ".//hp:img").find(el => el.hasAttribute("binItemIDRef"));
+        const id = hcImg?.getAttribute("binaryItemIDRef") ??
+            hpImg?.getAttribute("binItemIDRef") ??
+            null;
+        const href = id ? (binItems.get(id)?.href ?? null) : null;
+        return new ImageNode(id, href, fixtureBasename);
+    }
+    /**
+     * Returns the canonical asset filename: `<fixture>-<binItemId>.<ext>`.
+     * e.g. "image_hc-image1.png" for fixture "image_hc" with binItemId "image1".
+     */
+    assetFilename() {
+        if (!this.binItemId || !this.href)
+            return null;
+        const ext = this.href.split(".").pop() ?? "";
+        return `${this.fixtureBasename}-${this.binItemId}.${ext}`;
+    }
+    toMarkdown() {
+        const filename = this.assetFilename();
+        if (!filename)
+            return "";
+        return `![](${this.fixtureBasename}.assets/${filename})`;
+    }
+}
+exports.ImageNode = ImageNode;
+//# sourceMappingURL=image_node.js.map
