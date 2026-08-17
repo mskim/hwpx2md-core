@@ -53,6 +53,27 @@ back at `../src`, so shipping `out/` alone would leave consumers with dead maps.
 `npm run cross-check` compares this parser's output against the Ruby reference
 implementation, so it requires the Ruby gem to be installed. The other scripts do not.
 
+## Deliberately-failing tests
+
+The unit suite is green, but five tests are marked `it.fails` rather than
+passing normally — in `test/hwpx/containers/image_node.test.ts`,
+`containers/paragraph.test.ts`, `document.test.ts`, and `phase4-parity.test.ts`.
+
+They assert that images are emitted under `images/`, which is what wehangul's
+PRD §6.1 requires. The parser does not do that yet: it emits
+`<sourceBasename>.assets/<sourceBasename>-<binItemId>.<ext>`. That is a real
+unmet requirement, not stale test drift, so the assertions were left asserting
+the requirement instead of being rewritten to match current behaviour — which
+would have quietly converted "this is broken" into "this is fine".
+
+`it.fails` asserts that the test *does* fail. The moment the parser starts
+emitting `images/`, these turn red and have to be promoted back to ordinary
+`it`. The gap therefore stays visible and cannot be closed by accident.
+
+Note that the `v0.1.0` tag message predates this and still refers to "9 known
+failures"; that tag is immutable. The current state is 4 reconciled and 5
+pinned.
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).

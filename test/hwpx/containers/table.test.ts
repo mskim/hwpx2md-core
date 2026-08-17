@@ -30,18 +30,21 @@ describe("Table", () => {
         row("3-1", "3-2", "3-3"),
       ),
     );
+    // Table#toMarkdown emits an unpadded separator and pads the block with a
+    // leading \n and a trailing \n\n, mirroring Ruby Table#to_markdown.
     expect(t.toMarkdown()).toBe(
+      "\n" +
       "| 1-1 | 1-2 | 1-3 |\n" +
-      "| --- | --- | --- |\n" +
+      "|---|---|---|\n" +
       "| 2-1 | 2-2 | 2-3 |\n" +
-      "| 3-1 | 3-2 | 3-3 |",
+      "| 3-1 | 3-2 | 3-3 |\n\n",
     );
   });
 
   it("inserts the separator even when there is only one row (empty body)", () => {
     const t = Table.from(parseTable(row("only", "header")));
     expect(t.toMarkdown()).toBe(
-      "| only | header |\n| --- | --- |",
+      "\n| only | header |\n|---|---|\n\n",
     );
   });
 

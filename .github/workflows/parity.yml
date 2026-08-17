@@ -43,17 +43,24 @@ jobs:
         with: { node-version: 20, cache: npm }
       - run: npm ci
 
-      # 9 tests inherited from the hwpx2md extension fail: stale Phase 1-4
-      # expectations asserting `images/` paths and padded table separators, both
-      # of which the parser stopped emitting. They are NOT parser drift — the
-      # shared-spec golden corpus passes byte-exactly on all 15 fixtures in
-      # `parity`. Asserting the exact count is what makes a 10th failure visible;
-      # `continue-on-error` would hide it.
+      # The unit suite is fully green. The 9 stale expectations inherited from
+      # the hwpx2md extension have been resolved two different ways:
       #
-      # Lower this number when the stale expectations are reconciled. Never raise it.
-      - name: Unit suite, with 9 known-stale failures
+      #   * 4 table expectations were formatting drift with no requirement
+      #     behind them (padded `| --- |` separators, unwrapped table blocks).
+      #     They were reconciled to what the parser emits.
+      #   * 5 image expectations assert PRD §6.1's `images/` path, which the
+      #     parser genuinely does not satisfy — it emits
+      #     `<sourceBasename>.assets/<sourceBasename>-<binItemId>.<ext>`. Those
+      #     are pinned as `it.fails`, so they still assert the requirement and
+      #     still document the gap, but count as passes. When M4 makes the
+      #     parser emit `images/`, `it.fails` flips to red and forces them back
+      #     to ordinary `it` — the gap cannot be silently closed or forgotten.
+      #
+      # So 0 is the real number now, and a plain non-zero exit is the guard.
+      - name: Unit suite (0 failures; image gap is pinned as it.fails)
         run: |
           npx vitest run --exclude 'test/parity/**' --reporter=json --outputFile=/tmp/u.json || true
           failed=$(node -e "console.log(require('/tmp/u.json').numFailedTests)")
-          echo "failed=$failed (expected 9)"
-          [ "$failed" -eq 9 ] || { echo "::error::expected exactly 9 known failures, got $failed" >&2; exit 1; }
+          echo "failed=$failed (expected 0)"
+          [ "$failed" -eq 0 ] || { echo "::error::expected a green unit suite, got $failed failure(s)" >&2; exit 1; }
