@@ -9,11 +9,23 @@ export interface BulletItemSentinel {
     type: "bullet_item";
     level: number;
     text: string;
+    /**
+     * Free-pic markdown to emit ABOVE this item, not inside it.
+     *
+     * The gem pushes the image as its own `content` entry and then the sentinel,
+     * producing `![](p)\n\n  - text`. Folding the image into `text` would give
+     * `- ![](p) text`, which is different bytes. `document.ts` renders this only
+     * when present — interpolating it unguarded emits "undefined" into every
+     * bullet in the corpus.
+     */
+    imagePrefix?: string;
 }
 export interface NumberedItemSentinel {
     type: "numbered_item";
     level: number;
     text: string;
+    /** See BulletItemSentinel.imagePrefix. */
+    imagePrefix?: string;
 }
 export type ParagraphContent = string | BulletItemSentinel | NumberedItemSentinel;
 export declare class Paragraph {
@@ -41,7 +53,17 @@ export declare class Paragraph {
      * (Same heuristic as Ruby Phase 1.)
      */
     private listDescriptorForParaPr;
+    /**
+     * Free pics first, then the body.
+     *
+     * The separator is a BLANK LINE, and specifically not a single newline. The
+     * gem pushes each image as its own `content` entry and
+     * `ImageNode#to_markdown` already ends in "\n", so `content.join("\n")`
+     * yields `![](a)\n\n![](b)\n`. That trailing newline in the gem is what this
+     * depends on; deleting it there silently breaks parity here.
+     */
     toMarkdown(): ParagraphContent;
+    private bodyMarkdown;
     /**
      * Renders a paragraph that contains hp:equation nodes inline with text.
      * Walks run children: hp:t → emit text, hp:equation → emit converted LaTeX.

@@ -9,20 +9,44 @@ const math_node_1 = require("./math_node");
 const table_1 = require("./table");
 const text_run_1 = require("./text_run");
 /**
- * Wraps an hp:p element. Detection priority in Paragraph.from:
- *   1. .//hp:tbl present      → Paragraph holds a Table
- *   2. .//hp:pic present      → Paragraph holds ImageNode[]
- *   3. .//hp:equation present → Paragraph holds MathNode[]
- *   4. otherwise              → Paragraph holds TextRun[] (styled if charPrTable given)
+ * Wraps an hp:p element.
  *
- * Mixed-content paragraphs (e.g., text runs alongside an image or
- * equation) emit only the higher-priority element per Option C1 scope.
+ * Images are a PREFIX, not a mode. A paragraph resolves its FREE pics — those
+ * with no hp:tc ancestor — and emits them ahead of whatever else it holds:
+ *
+ *   free pics + text     → `![](…)` , blank line, text
+ *   free pics + no text  → the images alone (byte-identical to the old behaviour)
+ *   free pics + list     → the images ABOVE the bullet, via imagePrefix
+ *
+ * The body is still one of table / equations / text runs, in that order.
+ *
+ * This replaces an either/or dispatch that made a pic paragraph ImageNode[] and
+ * never read its runs, costing 18 paragraphs and 1,796 characters of the
+ * reference manuscript — the 추천사 pages, where a signature image sits beside a
+ * testimonial.
+ *
+ * Pics inside an hp:tc belong to that CELL, which renders and extracts them.
+ * The partition is total and disjoint, which is what stops the two paragraphs
+ * in chapter 07 that hold both a table and a free pic from double-emitting.
  */
 /**
  * Excludes anything living inside an hp:pic — its caption is the image's alt
  * text (`ImageNode.caption()`), not prose of the paragraph the image sits in.
  */
 const NOT_IN_PIC = "[not(ancestor::hp:pic)]";
+/** A pic under a table cell belongs to the cell, not to this paragraph. */
+const NOT_IN_CELL = "[not(ancestor::hp:tc)]";
+/**
+ * Body text excludes both a pic's caption and anything inside a table.
+ *
+ * The hp:tbl half is a GUARD, not a fix for an observed failure: the heading
+ * check (`headingLevelFor`) and the list check both run on `runTextOnly()`
+ * BEFORE the table branch, so populating runs unscoped would render `#`
+ * followed by every hp:t in the table, flattened. No fixture and no page in the
+ * reference book has that shape today — which is the argument for the guard,
+ * not against it.
+ */
+const NOT_IN_PIC_OR_TBL = "[not(ancestor::hp:pic) and not(ancestor::hp:tbl)]";
 class Paragraph {
     textRuns;
     table;
@@ -51,25 +75,25 @@ class Paragraph {
     static from(node, charPrTable, binItems, styleTable, headerDoc, fixtureBasename, footnoteQueue) {
         const styleId = node.getAttribute("styleIDRef");
         const paraPrId = node.getAttribute("paraPrIDRef");
+        // Resolved ONCE, ahead of the branch, because every branch carries them now.
+        const images = binItems
+            ? (0, xml_1.findAll)(node, `.//hp:pic${NOT_IN_CELL}`).map(p => image_node_1.ImageNode.from(p, binItems, fixtureBasename ?? ""))
+            : [];
         const tableNodes = (0, xml_1.findAll)(node, ".//hp:tbl");
         if (tableNodes.length > 0) {
-            return new Paragraph([], table_1.Table.from(tableNodes[0]), [], [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null);
-        }
-        const picNodes = (0, xml_1.findAll)(node, ".//hp:pic");
-        if (picNodes.length > 0 && binItems) {
-            return new Paragraph([], null, picNodes.map(p => image_node_1.ImageNode.from(p, binItems, fixtureBasename ?? "")), [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null);
+            return new Paragraph([], table_1.Table.from(tableNodes[0]), images, [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null);
         }
         const eqNodes = (0, xml_1.findAll)(node, ".//hp:equation");
         if (eqNodes.length > 0) {
-            return new Paragraph([], null, [], eqNodes.map(e => math_node_1.MathNode.from(e)), styleId, styleTable ?? null, paraPrId, headerDoc ?? null, node, charPrTable ?? null, footnoteQueue ?? null);
+            return new Paragraph([], null, images, eqNodes.map(e => math_node_1.MathNode.from(e)), styleId, styleTable ?? null, paraPrId, headerDoc ?? null, node, charPrTable ?? null, footnoteQueue ?? null);
         }
         // NOT_IN_PIC: a pic carries its caption at hp:pic > hp:caption >
         // hp:subList > hp:p > hp:run > hp:t. An unscoped `.//hp:run` picks up the
         // caption's own run, emitting the caption a second time at paragraph level;
         // TextRun's matching scope stops it being spliced into the sentence beside
         // it. Both are needed — they remove different halves of the same defect.
-        const runNodes = (0, xml_1.findAll)(node, `.//hp:run${NOT_IN_PIC}`);
-        return new Paragraph(runNodes.map(r => text_run_1.TextRun.from(r, charPrTable)), null, [], [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null, node, charPrTable ?? null, footnoteQueue ?? null);
+        const runNodes = (0, xml_1.findAll)(node, `.//hp:run${NOT_IN_PIC_OR_TBL}`);
+        return new Paragraph(runNodes.map(r => text_run_1.TextRun.from(r, charPrTable)), null, images, [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null, node, charPrTable ?? null, footnoteQueue ?? null);
     }
     runTextOnly() {
         return this.textRuns.map(r => r.text).join("").trim();
@@ -123,7 +147,31 @@ class Paragraph {
             return { kind: "numbered", level };
         return null;
     }
+    /**
+     * Free pics first, then the body.
+     *
+     * The separator is a BLANK LINE, and specifically not a single newline. The
+     * gem pushes each image as its own `content` entry and
+     * `ImageNode#to_markdown` already ends in "\n", so `content.join("\n")`
+     * yields `![](a)\n\n![](b)\n`. That trailing newline in the gem is what this
+     * depends on; deleting it there silently breaks parity here.
+     */
     toMarkdown() {
+        const imageMd = this.images
+            .map(i => i.toMarkdown())
+            .filter(md => md !== "")
+            .join("\n\n");
+        const body = this.bodyMarkdown();
+        if (imageMd === "")
+            return body;
+        // A list item keeps its structure; the image goes above it, not inside.
+        if (typeof body !== "string")
+            return { ...body, imagePrefix: imageMd };
+        // The gem's skip_para: an image paragraph with no prose is the image alone.
+        // This is what holds the three existing image goldens byte-identical.
+        return body.trim() === "" ? imageMd : `${imageMd}\n\n${body}`;
+    }
+    bodyMarkdown() {
         // TOC heading detection: check styleIDRef before any other content dispatch
         if (this.styleId && this.styleTable) {
             const level = this.styleTable.headingLevelFor(this.styleId);
@@ -142,9 +190,6 @@ class Paragraph {
         }
         if (this.table)
             return this.table.toMarkdown();
-        if (this.images.length > 0) {
-            return this.images.map(i => i.toMarkdown()).join("\n");
-        }
         if (this.equations.length > 0) {
             // Check if equations are mixed with text in the same run (inline equations)
             if (this._node) {

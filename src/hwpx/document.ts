@@ -86,7 +86,7 @@ export class Document {
         // Reset numbered counters when we hit a bullet
         prevLevel = -1;
         Object.keys(counters).forEach(k => delete counters[Number(k)]);
-        return `${indent}- ${entry.text}`;
+        return withImagePrefix(entry.imagePrefix, `${indent}- ${entry.text}`);
       }
 
       if (entry.type === "numbered_item") {
@@ -102,7 +102,7 @@ export class Document {
         }
         prevLevel = level;
         const indent = "  ".repeat(level);
-        return `${indent}${counters[level]}. ${entry.text}`;
+        return withImagePrefix(entry.imagePrefix, `${indent}${counters[level]}. ${entry.text}`);
       }
 
       return "";
@@ -154,6 +154,17 @@ export class Document {
   assets(): Asset[] {
     return this._assets;
   }
+}
+
+/**
+ * A list item's free pics go ABOVE the item, matching the gem, which pushes the
+ * image as its own `content` entry and then the sentinel.
+ *
+ * GUARDED, not interpolated. `${entry.imagePrefix}` on a sentinel without one
+ * renders the string "undefined" into every bullet in the corpus.
+ */
+function withImagePrefix(prefix: string | undefined, line: string): string {
+  return prefix ? `${prefix}\n\n${line}` : line;
 }
 
 function collectImageAssets(
