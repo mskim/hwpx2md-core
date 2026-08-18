@@ -8,6 +8,21 @@ const image_node_1 = require("./image_node");
 const math_node_1 = require("./math_node");
 const table_1 = require("./table");
 const text_run_1 = require("./text_run");
+/**
+ * Wraps an hp:p element. Detection priority in Paragraph.from:
+ *   1. .//hp:tbl present      → Paragraph holds a Table
+ *   2. .//hp:pic present      → Paragraph holds ImageNode[]
+ *   3. .//hp:equation present → Paragraph holds MathNode[]
+ *   4. otherwise              → Paragraph holds TextRun[] (styled if charPrTable given)
+ *
+ * Mixed-content paragraphs (e.g., text runs alongside an image or
+ * equation) emit only the higher-priority element per Option C1 scope.
+ */
+/**
+ * Excludes anything living inside an hp:pic — its caption is the image's alt
+ * text (`ImageNode.caption()`), not prose of the paragraph the image sits in.
+ */
+const NOT_IN_PIC = "[not(ancestor::hp:pic)]";
 class Paragraph {
     textRuns;
     table;
@@ -48,7 +63,12 @@ class Paragraph {
         if (eqNodes.length > 0) {
             return new Paragraph([], null, [], eqNodes.map(e => math_node_1.MathNode.from(e)), styleId, styleTable ?? null, paraPrId, headerDoc ?? null, node, charPrTable ?? null, footnoteQueue ?? null);
         }
-        const runNodes = (0, xml_1.findAll)(node, ".//hp:run");
+        // NOT_IN_PIC: a pic carries its caption at hp:pic > hp:caption >
+        // hp:subList > hp:p > hp:run > hp:t. An unscoped `.//hp:run` picks up the
+        // caption's own run, emitting the caption a second time at paragraph level;
+        // TextRun's matching scope stops it being spliced into the sentence beside
+        // it. Both are needed — they remove different halves of the same defect.
+        const runNodes = (0, xml_1.findAll)(node, `.//hp:run${NOT_IN_PIC}`);
         return new Paragraph(runNodes.map(r => text_run_1.TextRun.from(r, charPrTable)), null, [], [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null, node, charPrTable ?? null, footnoteQueue ?? null);
     }
     runTextOnly() {
@@ -128,7 +148,7 @@ class Paragraph {
         if (this.equations.length > 0) {
             // Check if equations are mixed with text in the same run (inline equations)
             if (this._node) {
-                const hasInlineText = (0, xml_1.findAll)(this._node, ".//hp:t").some(t => (t.textContent ?? "").trim().length > 0);
+                const hasInlineText = (0, xml_1.findAll)(this._node, `.//hp:t${NOT_IN_PIC}`).some(t => (t.textContent ?? "").trim().length > 0);
                 if (hasInlineText) {
                     return this.renderWithInlineEquations();
                 }
@@ -193,7 +213,7 @@ class Paragraph {
             if (!isRunNode(node))
                 return;
             // Check for fieldBegin HYPERLINK controls
-            const fieldBeginCtrls = (0, xml_1.findAll)(node, ".//hp:ctrl").filter(ctrl => (0, xml_1.findAll)(ctrl, ".//hp:fieldBegin").some(fb => fb.getAttribute("type") === "HYPERLINK"));
+            const fieldBeginCtrls = (0, xml_1.findAll)(node, `.//hp:ctrl${NOT_IN_PIC}`).filter(ctrl => (0, xml_1.findAll)(ctrl, ".//hp:fieldBegin").some(fb => fb.getAttribute("type") === "HYPERLINK"));
             for (const ctrl of fieldBeginCtrls) {
                 const fbNodes = (0, xml_1.findAll)(ctrl, ".//hp:fieldBegin");
                 const fb = fbNodes.find(n => n.getAttribute("type") === "HYPERLINK");
@@ -213,7 +233,7 @@ class Paragraph {
                 });
             }
             // Check for fieldEnd controls
-            const fieldEndCtrls = (0, xml_1.findAll)(node, ".//hp:ctrl").filter(ctrl => (0, xml_1.findAll)(ctrl, ".//hp:fieldEnd").length > 0);
+            const fieldEndCtrls = (0, xml_1.findAll)(node, `.//hp:ctrl${NOT_IN_PIC}`).filter(ctrl => (0, xml_1.findAll)(ctrl, ".//hp:fieldEnd").length > 0);
             for (const ctrl of fieldEndCtrls) {
                 const feNodes = (0, xml_1.findAll)(ctrl, ".//hp:fieldEnd");
                 const fe = feNodes[0];
@@ -287,7 +307,7 @@ class Paragraph {
             }
             // For runs inside a link span, buffer text
             if (linkBuffer !== null && skipIdxSet.has(runIdx)) {
-                for (const t of (0, xml_1.findAll)(node, ".//hp:t")) {
+                for (const t of (0, xml_1.findAll)(node, `.//hp:t${NOT_IN_PIC}`)) {
                     linkBuffer += t.textContent ?? "";
                 }
                 return;

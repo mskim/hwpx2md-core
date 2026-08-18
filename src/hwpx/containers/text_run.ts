@@ -27,7 +27,13 @@ export class TextRun {
   ) {}
 
   static from(node: Element, charPrTable?: CharPrTable): TextRun {
-    const textNodes = findAll(node, ".//hp:t");
+    // NOT into an hp:pic. A pic carries its caption at
+    // hp:pic > hp:caption > hp:subList > hp:p > hp:run > hp:t, and a bare
+    // `.//hp:t` reaches it — splicing the caption into the middle of the
+    // sentence the image sits beside:
+    //   "…훌륭한 우리나" + "이 태 섭" + "라는 고조선(古朝鮮)에 이어…"
+    // Caption text is the image's alt text (ImageNode.caption()) and nothing else.
+    const textNodes = findAll(node, ".//hp:t[not(ancestor::hp:pic)]");
     const ref = node.getAttribute("charPrIDRef") ?? "";
     const style = (charPrTable && charPrTable.get(ref)) ?? NO_STYLE;
     return new TextRun(textNodes.map(t => Text.from(t)), style);

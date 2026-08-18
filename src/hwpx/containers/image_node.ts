@@ -24,7 +24,7 @@ import { findAll } from "../ingest/xml";
  * Hangul and a space inside a markdown link target.
  *
  * Phase 4 scope (Option C1):
- * - Empty alt text (no caption extraction).
+ * - Alt text comes from the pic's own hp:caption (see `caption()`).
  * - No width/height attributes.
  * - Resolves both the current `<hc:img binaryItemIDRef="...">` form and the
  *   older `<hp:img binItemIDRef="...">` form. Either populates `.binItemId`.
@@ -34,6 +34,8 @@ export class ImageNode {
     readonly binItemId: string | null,
     readonly href: string | null,
     private readonly fixtureBasename: string,
+    /** Retained so `caption()` can be read lazily, at markdown time. */
+    private readonly node: Element,
   ) {}
 
   static from(node: Element, binItems: BinItemTable, fixtureBasename: string): ImageNode {
@@ -53,7 +55,7 @@ export class ImageNode {
       hpImg?.getAttribute("binItemIDRef") ??
       null;
     const href = id ? (binItems.get(id)?.href ?? null) : null;
-    return new ImageNode(id, href, fixtureBasename);
+    return new ImageNode(id, href, fixtureBasename, node);
   }
 
   /**
@@ -66,9 +68,31 @@ export class ImageNode {
     return `${this.fixtureBasename}-${this.binItemId}.${ext}`;
   }
 
+  /**
+   * The pic's caption, which is this image's alt text — and NOT part of the
+   * prose of the paragraph the image sits in. It lives at
+   * `hp:pic > hp:caption > hp:subList > hp:p > hp:run > hp:t`, which every
+   * descendant-axis query in `Paragraph` and `TextRun` used to reach; see the
+   * `not(ancestor::hp:pic)` scoping there for the other half of this.
+   *
+   * EVERY `hp:t`, joined, not just the first. The Ruby gem took `at_xpath`, and
+   * that is indistinguishable from correct across all 11 captions in the
+   * reference book only because the extra nodes are whitespace — a caption
+   * split across two styled runs silently loses everything after the first.
+   *
+   * Returns "" rather than null for an absent or whitespace-only caption, so
+   * callers interpolate it directly.
+   */
+  caption(): string {
+    return findAll(this.node, ".//hp:caption//hp:t")
+      .map(t => t.textContent ?? "")
+      .join("")
+      .trim();
+  }
+
   toMarkdown(): string {
     const filename = this.assetFilename();
     if (!filename) return "";
-    return `![](${this.fixtureBasename}.assets/${filename})`;
+    return `![${this.caption()}](${this.fixtureBasename}.assets/${filename})`;
   }
 }

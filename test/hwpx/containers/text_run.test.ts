@@ -90,4 +90,20 @@ describe("TextRun", () => {
     const run = TextRun.from(doc.documentElement, table);
     expect(run.toMarkdown()).toBe("");
   });
+
+  // An hp:pic carries its caption at hp:pic > hp:caption > hp:subList > hp:p >
+  // hp:run > hp:t. `.//hp:t` reaches it, which splices the caption into the
+  // middle of the sentence the image sits beside:
+  //   "…훌륭한 우리나" + "이 태 섭" + "라는 고조선(古朝鮮)에 이어…"
+  // Caption text belongs to the image, as alt text, and nowhere else.
+  it("does not descend into an hp:pic caption", () => {
+    const run = TextRun.from(
+      parseRun(
+        `<hp:t>대한민국은 우리나</hp:t>` +
+          `<hp:pic><hp:caption><hp:subList><hp:p><hp:run><hp:t>이 태 섭</hp:t></hp:run></hp:p></hp:subList></hp:caption></hp:pic>` +
+          `<hp:t>라는 고조선에 이어</hp:t>`,
+      ),
+    );
+    expect(run.text).toBe("대한민국은 우리나\n라는 고조선에 이어");
+  });
 });

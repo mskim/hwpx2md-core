@@ -5,16 +5,6 @@ import { ImageNode } from "./image_node";
 import { MathNode } from "./math_node";
 import { Table } from "./table";
 import { TextRun } from "./text_run";
-/**
- * Wraps an hp:p element. Detection priority in Paragraph.from:
- *   1. .//hp:tbl present      → Paragraph holds a Table
- *   2. .//hp:pic present      → Paragraph holds ImageNode[]
- *   3. .//hp:equation present → Paragraph holds MathNode[]
- *   4. otherwise              → Paragraph holds TextRun[] (styled if charPrTable given)
- *
- * Mixed-content paragraphs (e.g., text runs alongside an image or
- * equation) emit only the higher-priority element per Option C1 scope.
- */
 export interface BulletItemSentinel {
     type: "bullet_item";
     level: number;
