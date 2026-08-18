@@ -1,6 +1,11 @@
 /// <reference lib="dom" />
 
+import type { BinItemTable } from "../ingest/bin_items";
 import { findAll } from "../ingest/xml";
+import { ImageNode } from "./image_node";
+
+/** A pic's caption is its alt text, not text of the cell that holds it. */
+const NOT_IN_PIC = "[not(ancestor::hp:pic)]";
 
 /**
  * Wraps an hp:tc element. Phase 3 emits plain text only — no inline styling,
@@ -19,24 +24,35 @@ export class TableCell {
     private readonly _rowSpan: number,
     readonly colAddr: number,
     readonly rowAddr: number,
+    /** Pics living in THIS cell. The paragraph owns only the free ones. */
+    readonly images: ImageNode[],
   ) {}
 
-  static from(node: Element): TableCell {
+  /**
+   * `binItems` and `fixtureBasename` are OPTIONAL, and must stay that way: the
+   * container unit tests call TableCell.from / TableRow.from / Table.from
+   * directly with the original arity.
+   */
+  static from(node: Element, binItems?: BinItemTable, fixtureBasename?: string): TableCell {
     // Join paragraph texts with a space (mirrors Ruby text_for_html for multi-paragraph cells)
     const paragraphNodes = findAll(node, ".//hp:p");
     let joined: string;
     if (paragraphNodes.length > 0) {
       const paraTexts = paragraphNodes
         .map(p => {
-          const ts = findAll(p, ".//hp:t");
+          const ts = findAll(p, `.//hp:t${NOT_IN_PIC}`);
           return ts.map(t => t.textContent ?? "").join("").trim();
         })
         .filter(s => s !== "");
       joined = paraTexts.join(" ");
     } else {
-      const texts = findAll(node, ".//hp:t");
+      const texts = findAll(node, `.//hp:t${NOT_IN_PIC}`);
       joined = texts.map(t => t.textContent ?? "").join("");
     }
+
+    const images = binItems
+      ? findAll(node, ".//hp:pic").map(p => ImageNode.from(p, binItems, fixtureBasename ?? ""))
+      : [];
 
     // Read span info from hp:cellSpan child element
     const spanNodes = findAll(node, "hp:cellSpan");
@@ -50,7 +66,7 @@ export class TableCell {
     const colAddr = addrNode ? parseInt(addrNode.getAttribute("colAddr") ?? "0", 10) : 0;
     const rowAddr = addrNode ? parseInt(addrNode.getAttribute("rowAddr") ?? "0", 10) : 0;
 
-    return new TableCell(joined, colSpan, rowSpan, colAddr, rowAddr);
+    return new TableCell(joined, colSpan, rowSpan, colAddr, rowAddr, images);
   }
 
   get colSpan(): number { return this._colSpan; }
@@ -61,9 +77,14 @@ export class TableCell {
   }
 
   toMarkdown(): string {
+    const parts = this.images.map(i => i.toMarkdown()).filter(md => md !== "");
     const trimmed = this._rawText.trim();
-    if (trimmed === "") return "&nbsp;";
-    return trimmed.replace(/\|/g, "\\|");
+    if (trimmed !== "") parts.push(trimmed);
+    if (parts.length === 0) return "&nbsp;";
+    // Escape the COMPOSED cell, not just the harvested text — a caption
+    // containing a pipe would otherwise break the row. Asset paths cannot
+    // contain one.
+    return parts.join(" ").replace(/\|/g, "\\|");
   }
 
   /** Emit <td> with colspan/rowspan for HTML table fallback. */
@@ -73,11 +94,13 @@ export class TableCell {
     if (this._rowSpan > 1) attrs += ` rowspan="${this._rowSpan}"`;
 
     // Join paragraphs with a space (mirrors Ruby text_for_html)
-    const inner = this._rawText
+    const text = this._rawText
       .trim()
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
-    return `<td${attrs}>${inner}</td>`;
+    const parts = this.images.map(i => i.toHtml()).filter(html => html !== "");
+    if (text !== "") parts.push(text);
+    return `<td${attrs}>${parts.join(" ")}</td>`;
   }
 }

@@ -81,7 +81,7 @@ class Paragraph {
             : [];
         const tableNodes = (0, xml_1.findAll)(node, ".//hp:tbl");
         if (tableNodes.length > 0) {
-            return new Paragraph([], table_1.Table.from(tableNodes[0]), images, [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null);
+            return new Paragraph([], table_1.Table.from(tableNodes[0], binItems, fixtureBasename), images, [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null);
         }
         const eqNodes = (0, xml_1.findAll)(node, ".//hp:equation");
         if (eqNodes.length > 0) {
@@ -94,6 +94,16 @@ class Paragraph {
         // it. Both are needed — they remove different halves of the same defect.
         const runNodes = (0, xml_1.findAll)(node, `.//hp:run${NOT_IN_PIC_OR_TBL}`);
         return new Paragraph(runNodes.map(r => text_run_1.TextRun.from(r, charPrTable)), null, images, [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null, node, charPrTable ?? null, footnoteQueue ?? null);
+    }
+    /**
+     * Free pics PLUS any held by this paragraph's table cells — everything that
+     * must be written to disk for the markdown's links to resolve.
+     *
+     * Deliberately not `images`, which stays free-pics-only because that is what
+     * `toMarkdown()` emits as a prefix; cells emit their own.
+     */
+    allImages() {
+        return this.table ? [...this.images, ...this.table.images()] : this.images;
     }
     runTextOnly() {
         return this.textRuns.map(r => r.text).join("").trim();

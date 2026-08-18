@@ -175,7 +175,9 @@ function collectImageAssets(
   const seen = new Set<string>();
   const assets: Asset[] = [];
   for (const p of paragraphs) {
-    for (const img of p.images) {
+    // allImages(), NOT images: the latter is free pics only, and a plate living
+    // in a table cell would otherwise be linked but never written.
+    for (const img of p.allImages()) {
       if (!img.href || seen.has(img.href)) continue;
       const buffer = entries.get(img.href);
       if (!buffer) continue;

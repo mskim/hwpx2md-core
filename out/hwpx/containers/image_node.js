@@ -87,6 +87,19 @@ class ImageNode {
             .join("")
             .trim();
     }
+    /**
+     * For the HTML span-table fallback, where raw markdown inside a <td> does not
+     * render. Alt is `caption || "image"`, matching the gem's ImageNode#to_html —
+     * NOT alt="". Neither ch07 table spans, so no fixture reaches this path and
+     * cross-check cannot catch a divergence here.
+     */
+    toHtml() {
+        const filename = this.assetFilename();
+        if (!filename)
+            return "";
+        const alt = this.caption() || "image";
+        return `<img src="${this.fixtureBasename}.assets/${filename}" alt="${alt}">`;
+    }
     toMarkdown() {
         const filename = this.assetFilename();
         if (!filename)

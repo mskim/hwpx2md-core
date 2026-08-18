@@ -42,6 +42,14 @@ export declare class Paragraph {
     private readonly _footnoteQueue;
     private constructor();
     static from(node: Element, charPrTable?: CharPrTable, binItems?: BinItemTable, styleTable?: StyleTable, headerDoc?: Document, fixtureBasename?: string, footnoteQueue?: Array<[string, string]>): Paragraph;
+    /**
+     * Free pics PLUS any held by this paragraph's table cells — everything that
+     * must be written to disk for the markdown's links to resolve.
+     *
+     * Deliberately not `images`, which stays free-pics-only because that is what
+     * `toMarkdown()` emits as a prefix; cells emit their own.
+     */
+    allImages(): ImageNode[];
     private runTextOnly;
     /**
      * Look up the paraPr's heading info from header.xml.

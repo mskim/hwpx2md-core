@@ -1,6 +1,8 @@
 /// <reference lib="dom" />
 
+import type { BinItemTable } from "../ingest/bin_items";
 import { findAll } from "../ingest/xml";
+import type { ImageNode } from "./image_node";
 import { TableCell } from "./table_cell";
 
 /**
@@ -14,9 +16,14 @@ import { TableCell } from "./table_cell";
 export class TableRow {
   private constructor(readonly cells: TableCell[]) {}
 
-  static from(node: Element): TableRow {
+  static from(node: Element, binItems?: BinItemTable, fixtureBasename?: string): TableRow {
     const cellNodes = findAll(node, "hp:tc");
-    return new TableRow(cellNodes.map(c => TableCell.from(c)));
+    return new TableRow(cellNodes.map(c => TableCell.from(c, binItems, fixtureBasename)));
+  }
+
+  /** Every image held by this row's cells, for the document's asset manifest. */
+  images(): ImageNode[] {
+    return this.cells.flatMap(c => c.images);
   }
 
   /**

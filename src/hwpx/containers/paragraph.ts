@@ -115,7 +115,7 @@ export class Paragraph {
 
     const tableNodes = findAll(node, ".//hp:tbl");
     if (tableNodes.length > 0) {
-      return new Paragraph([], Table.from(tableNodes[0]), images, [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null);
+      return new Paragraph([], Table.from(tableNodes[0], binItems, fixtureBasename), images, [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null);
     }
     const eqNodes = findAll(node, ".//hp:equation");
     if (eqNodes.length > 0) {
@@ -152,6 +152,17 @@ export class Paragraph {
       charPrTable ?? null,
       footnoteQueue ?? null,
     );
+  }
+
+  /**
+   * Free pics PLUS any held by this paragraph's table cells — everything that
+   * must be written to disk for the markdown's links to resolve.
+   *
+   * Deliberately not `images`, which stays free-pics-only because that is what
+   * `toMarkdown()` emits as a prefix; cells emit their own.
+   */
+  allImages(): ImageNode[] {
+    return this.table ? [...this.images, ...this.table.images()] : this.images;
   }
 
   private runTextOnly(): string {

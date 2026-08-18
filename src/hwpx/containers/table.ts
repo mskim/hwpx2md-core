@@ -1,6 +1,8 @@
 /// <reference lib="dom" />
 
+import type { BinItemTable } from "../ingest/bin_items";
 import { findAll } from "../ingest/xml";
+import type { ImageNode } from "./image_node";
 import { TableRow } from "./table_row";
 
 /**
@@ -18,9 +20,21 @@ import { TableRow } from "./table_row";
 export class Table {
   private constructor(readonly rows: TableRow[]) {}
 
-  static from(node: Element): Table {
+  static from(node: Element, binItems?: BinItemTable, fixtureBasename?: string): Table {
     const trNodes = findAll(node, "hp:tr");
-    return new Table(trNodes.map(tr => TableRow.from(tr)));
+    return new Table(trNodes.map(tr => TableRow.from(tr, binItems, fixtureBasename)));
+  }
+
+  /**
+   * Every image held by this table's cells.
+   *
+   * `Paragraph.images` is FREE pics only, and `collectImageAssets` walks it —
+   * so without this route the markdown would link plate files that are never
+   * written. The gem does not have this problem: its image extractor walks
+   * //hp:pic document-wide, which is why the port is the side that would go red.
+   */
+  images(): ImageNode[] {
+    return this.rows.flatMap(r => r.images());
   }
 
   /** Returns true if any cell has colSpan>1 or rowSpan>1. */

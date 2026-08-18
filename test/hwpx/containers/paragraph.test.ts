@@ -175,7 +175,7 @@ describe("Paragraph", () => {
     // Ownership: a pic under an hp:tc belongs to the CELL, not the paragraph.
     // Two paragraphs in chapter 07 hold both a table and a free pic, so an
     // "images or table" rule would either double-emit or drop.
-    it("ignores pics inside a table cell", () => {
+    it("leaves an in-cell pic to the cell — emitted once, not twice", () => {
       const p = Paragraph.from(
         pic(
           `<hp:run><hp:tbl><hp:tr><hp:tc><hp:subList><hp:p><hp:run>` +
@@ -184,8 +184,14 @@ describe("Paragraph", () => {
         ),
         undefined, BIN, undefined, undefined, "fx",
       );
+      // The paragraph does not CLAIM it...
       expect(p.images).toHaveLength(0);
-      expect(String(p.toMarkdown())).not.toContain("![](");
+      // ...but the cell renders it, exactly once. Both halves matter: claiming
+      // it here as well is precisely how it would be emitted twice.
+      const out = String(p.toMarkdown());
+      expect(out.match(/!\[\]\(fx\.assets\/fx-image1\.jpg\)/g)).toHaveLength(1);
+      // And it reaches the asset manifest through the table, not the paragraph.
+      expect(p.allImages().map(i => i.binItemId)).toEqual(["image1"]);
     });
 
     it("keeps a free pic in a paragraph that also holds a table", () => {

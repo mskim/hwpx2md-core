@@ -1,3 +1,5 @@
+import type { BinItemTable } from "../ingest/bin_items";
+import type { ImageNode } from "./image_node";
 import { TableRow } from "./table_row";
 /**
  * Wraps an hp:tbl element. Renders as GFM pipe table with a default
@@ -14,7 +16,16 @@ import { TableRow } from "./table_row";
 export declare class Table {
     readonly rows: TableRow[];
     private constructor();
-    static from(node: Element): Table;
+    static from(node: Element, binItems?: BinItemTable, fixtureBasename?: string): Table;
+    /**
+     * Every image held by this table's cells.
+     *
+     * `Paragraph.images` is FREE pics only, and `collectImageAssets` walks it —
+     * so without this route the markdown would link plate files that are never
+     * written. The gem does not have this problem: its image extractor walks
+     * //hp:pic document-wide, which is why the port is the side that would go red.
+     */
+    images(): ImageNode[];
     /** Returns true if any cell has colSpan>1 or rowSpan>1. */
     hasSpans(): boolean;
     /** Emit raw HTML <table> for tables with spanning cells. */
