@@ -7,6 +7,8 @@ export interface Item {
     readonly figures: string[];
     readonly choices: Choice[];
     readonly type: "multiple_choice" | "short_answer";
+    /** 배점, when the paper prints one. 수학 never does; 국어 does on 21% of items. */
+    readonly points: number | null;
     readonly answer: string;
     readonly explanation: string;
     readonly mismatch: string | null;

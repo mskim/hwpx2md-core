@@ -36,6 +36,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Document = void 0;
 const path = __importStar(require("node:path"));
+const image_node_1 = require("./containers/image_node");
 const paragraph_1 = require("./containers/paragraph");
 const bin_items_1 = require("./ingest/bin_items");
 const styles_1 = require("./ingest/styles");
@@ -79,14 +80,23 @@ class Document {
             .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
         const footnoteQueue = [];
         const paragraphs = [];
+        // Figures living inside a note. A paragraph deliberately does NOT claim
+        // these — they belong to the note, not the prose beside it — but they still
+        // have to reach disk, or a 해설 renders with a broken image link. Before the
+        // note scope was added they were collected only as a side effect of the
+        // leak, which is not a mechanism worth relying on.
+        const noteImages = [];
         for (const name of sectionNames) {
             const buffer = entries.get(name);
             const xml = (0, xml_1.parseXml)(buffer);
             for (const p of (0, xml_1.findAll)(xml, "//hs:sec/hp:p")) {
                 paragraphs.push(paragraph_1.Paragraph.from(p, charPrTable, binItemTable, styleTable, headerDoc ?? undefined, basename, footnoteQueue));
+                for (const pic of (0, xml_1.findAll)(p, ".//hp:endNote//hp:pic | .//hp:footNote//hp:pic")) {
+                    noteImages.push(image_node_1.ImageNode.from(pic, binItemTable, basename));
+                }
             }
         }
-        const assets = collectImageAssets(paragraphs, entries, basename);
+        const assets = collectImageAssets(paragraphs, noteImages, entries, basename);
         return new Document(paragraphs, assets, footnoteQueue);
     }
     paragraphs() {
@@ -185,23 +195,27 @@ exports.Document = Document;
 function withImagePrefix(prefix, line) {
     return prefix ? `${prefix}\n\n${line}` : line;
 }
-function collectImageAssets(paragraphs, entries, fixtureBasename) {
+function collectImageAssets(paragraphs, noteImages, entries, fixtureBasename) {
     const seen = new Set();
     const assets = [];
+    const push = (img) => {
+        if (!img.href || seen.has(img.href))
+            return;
+        const buffer = entries.get(img.href);
+        if (!buffer)
+            return;
+        seen.add(img.href);
+        const filename = img.assetFilename() ?? (img.href.split("/").pop() ?? img.href);
+        assets.push({ relativePath: filename, content: buffer });
+    };
     for (const p of paragraphs) {
         // allImages(), NOT images: the latter is free pics only, and a plate living
         // in a table cell would otherwise be linked but never written.
-        for (const img of p.allImages()) {
-            if (!img.href || seen.has(img.href))
-                continue;
-            const buffer = entries.get(img.href);
-            if (!buffer)
-                continue;
-            seen.add(img.href);
-            const filename = img.assetFilename() ?? (img.href.split("/").pop() ?? img.href);
-            assets.push({ relativePath: filename, content: buffer });
-        }
+        for (const img of p.allImages())
+            push(img);
     }
+    for (const img of noteImages)
+        push(img);
     return assets;
 }
 //# sourceMappingURL=document.js.map

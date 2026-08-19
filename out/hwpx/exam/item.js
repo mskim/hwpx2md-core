@@ -61,7 +61,11 @@ function assembleItems(paragraphs, answerFor, binItems, fixtureBasename) {
             if (asChoices) {
                 if (figure)
                     figures.push(figure);
-                choices.push(...asChoices);
+                // Choices arrive from RENDERED markdown, which has not been through the
+                // normaliser — stems and explanations are built here and normalised on
+                // the way. Without this a reader sees `$$\mathrm {ln} \, 2$$` in the
+                // options and `$$\ln2$$` in the solution to the same question.
+                choices.push(...asChoices.map(c => ({ ...c, text: (0, latex_1.normaliseLatex)(c.text) })));
                 continue;
             }
             if (choices.length > 0)
@@ -80,7 +84,7 @@ function assembleItems(paragraphs, answerFor, binItems, fixtureBasename) {
             const recovered = recoverFirstChoices(stem);
             if (recovered) {
                 stem = recovered.stem;
-                choices.unshift(...recovered.choices);
+                choices.unshift(...recovered.choices.map(c => ({ ...c, text: (0, latex_1.normaliseLatex)(c.text) })));
             }
         }
         const type = choices.length > 0 ? "multiple_choice" : "short_answer";
@@ -94,6 +98,7 @@ function assembleItems(paragraphs, answerFor, binItems, fixtureBasename) {
             figures,
             choices,
             type,
+            points: null,
             answer: split.answer,
             explanation: split.explanation,
             mismatch: split.mismatch,

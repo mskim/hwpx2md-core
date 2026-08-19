@@ -20,7 +20,7 @@ const TRACKS = ["확률과통계", "미적분", "기하"];
 const COMMON = "공통";
 const CIRCLED = "①②③④⑤";
 
-export function parseAnswerKey(scope: Element): AnswerKey | null {
+export function parseAnswerKey(scope: Document | Element): AnswerKey | null {
   const table = findAll(scope, ".//hp:tbl").find(t => {
     const text = cellTexts(t).join("");
     return TRACKS.every(name => text.includes(name));

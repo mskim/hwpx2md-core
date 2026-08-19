@@ -15,7 +15,12 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.normaliseLatex = normaliseLatex;
 /** HWP writes these as upright text; LaTeX has a macro for each. */
-const FUNCTIONS = ["lim", "sin", "cos", "tan", "log", "ln", "max", "min", "exp"];
+const FUNCTIONS = [
+    "lim", "log", "ln", "exp", "max", "min", "det", "gcd", "deg",
+    "sin", "cos", "tan", "sec", "csc", "cot",
+    "sinh", "cosh", "tanh",
+    "arcsin", "arccos", "arctan",
+];
 function normaliseLatex(src) {
     return src.replace(/\$\$([\s\S]*?)\$\$/g, (_m, body) => `$$${normaliseBody(body)}$$`);
 }
@@ -49,9 +54,10 @@ function normaliseBody(input) {
     out = out.replace(/,(\S)/g, ", $1");
     out = out.replace(/\s+([)\]}])/g, "$1");
     out = out.replace(/([([{])\s+/g, "$1");
-    // 8. A macro keeps its space ONLY when a letter follows, or the name absorbs
-    //    it: `\to X` must stay, `\theta<0` must not.
-    out = out.replace(/(\\[a-zA-Z]+)\s+(?![a-zA-Z])/g, "$1");
+    // 8. A macro keeps its space when a letter or DIGIT follows — `\to X`,
+    //    `\to 0` — and loses it otherwise, since `\theta<0` needs none and
+    //    `\dfrac{` would look wrong with one.
+    out = out.replace(/(\\[a-zA-Z]+)\s+(?![a-zA-Z0-9])/g, "$1");
     return out.trim();
 }
 //# sourceMappingURL=latex.js.map

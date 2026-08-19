@@ -2,6 +2,7 @@
 
 import * as path from "node:path";
 import type { Asset } from "../types";
+import { ImageNode } from "./containers/image_node";
 import { Paragraph } from "./containers/paragraph";
 import type { ParagraphContent } from "./containers/paragraph";
 import { parseBinItemTable, type BinItemTable } from "./ingest/bin_items";
@@ -49,15 +50,24 @@ export class Document {
 
     const footnoteQueue: Array<[string, string]> = [];
     const paragraphs: Paragraph[] = [];
+    // Figures living inside a note. A paragraph deliberately does NOT claim
+    // these — they belong to the note, not the prose beside it — but they still
+    // have to reach disk, or a 해설 renders with a broken image link. Before the
+    // note scope was added they were collected only as a side effect of the
+    // leak, which is not a mechanism worth relying on.
+    const noteImages: ImageNode[] = [];
     for (const name of sectionNames) {
       const buffer = entries.get(name)!;
       const xml = parseXml(buffer);
       for (const p of findAll(xml, "//hs:sec/hp:p")) {
         paragraphs.push(Paragraph.from(p, charPrTable, binItemTable, styleTable, headerDoc ?? undefined, basename, footnoteQueue));
+        for (const pic of findAll(p, ".//hp:endNote//hp:pic | .//hp:footNote//hp:pic")) {
+          noteImages.push(ImageNode.from(pic, binItemTable, basename));
+        }
       }
     }
 
-    const assets = collectImageAssets(paragraphs, entries, basename);
+    const assets = collectImageAssets(paragraphs, noteImages, entries, basename);
     return new Document(paragraphs, assets, footnoteQueue);
   }
 
@@ -169,22 +179,25 @@ function withImagePrefix(prefix: string | undefined, line: string): string {
 
 function collectImageAssets(
   paragraphs: Paragraph[],
+  noteImages: readonly ImageNode[],
   entries: Map<string, Buffer>,
   fixtureBasename: string,
 ): Asset[] {
   const seen = new Set<string>();
   const assets: Asset[] = [];
+  const push = (img: ImageNode): void => {
+    if (!img.href || seen.has(img.href)) return;
+    const buffer = entries.get(img.href);
+    if (!buffer) return;
+    seen.add(img.href);
+    const filename = img.assetFilename() ?? (img.href.split("/").pop() ?? img.href);
+    assets.push({ relativePath: filename, content: buffer });
+  };
   for (const p of paragraphs) {
     // allImages(), NOT images: the latter is free pics only, and a plate living
     // in a table cell would otherwise be linked but never written.
-    for (const img of p.allImages()) {
-      if (!img.href || seen.has(img.href)) continue;
-      const buffer = entries.get(img.href);
-      if (!buffer) continue;
-      seen.add(img.href);
-      const filename = img.assetFilename() ?? (img.href.split("/").pop() ?? img.href);
-      assets.push({ relativePath: filename, content: buffer });
-    }
+    for (const img of p.allImages()) push(img);
   }
+  for (const img of noteImages) push(img);
   return assets;
 }
