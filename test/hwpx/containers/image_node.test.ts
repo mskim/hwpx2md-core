@@ -61,4 +61,59 @@ describe("ImageNode", () => {
     expect(node.binItemId).toBeNull();
     expect(node.toMarkdown()).toBe("");
   });
+
+  describe("caption as alt text", () => {
+    const BIN = new Map([["image1", { href: "BinData/image1.jpg" }]]);
+
+    it("emits the caption as alt text", () => {
+      const node = ImageNode.from(
+        parsePic(
+          `<hc:img binaryItemIDRef="image1"/>` +
+            `<hp:caption><hp:subList><hp:p><hp:run><hp:t>이 귀 남</hp:t></hp:run></hp:p></hp:subList></hp:caption>`,
+        ),
+        BIN,
+        "fx",
+      );
+      expect(node.caption()).toBe("이 귀 남");
+      expect(node.toMarkdown()).toBe("![이 귀 남](fx.assets/fx-image1.jpg)");
+    });
+
+    // The gem took at_xpath — the FIRST hp:t only. That is indistinguishable
+    // from correct across all 11 captions in the reference book because the
+    // extra nodes are whitespace. A caption split across two styled runs loses
+    // everything after the first, and no fixture would catch it.
+    it("joins EVERY hp:t in the caption, not just the first", () => {
+      const node = ImageNode.from(
+        parsePic(
+          `<hc:img binaryItemIDRef="image1"/>` +
+            `<hp:caption><hp:subList><hp:p>` +
+            `<hp:run><hp:t>앞부분</hp:t></hp:run>` +
+            `<hp:run><hp:t>뒷부분</hp:t></hp:run>` +
+            `</hp:p></hp:subList></hp:caption>`,
+        ),
+        BIN,
+        "fx",
+      );
+      expect(node.caption()).toBe("앞부분뒷부분");
+    });
+
+    it("treats a whitespace-only caption as absent", () => {
+      const node = ImageNode.from(
+        parsePic(
+          `<hc:img binaryItemIDRef="image1"/>` +
+            `<hp:caption><hp:subList><hp:p><hp:run><hp:t>   </hp:t></hp:run></hp:p></hp:subList></hp:caption>`,
+        ),
+        BIN,
+        "fx",
+      );
+      expect(node.caption()).toBe("");
+      expect(node.toMarkdown()).toBe("![](fx.assets/fx-image1.jpg)");
+    });
+
+    it("emits empty alt when there is no caption at all", () => {
+      const node = ImageNode.from(parsePic(`<hc:img binaryItemIDRef="image1"/>`), BIN, "fx");
+      expect(node.caption()).toBe("");
+      expect(node.toMarkdown()).toBe("![](fx.assets/fx-image1.jpg)");
+    });
+  });
 });

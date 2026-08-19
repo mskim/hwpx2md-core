@@ -24,7 +24,7 @@ const xml_1 = require("../ingest/xml");
  * Hangul and a space inside a markdown link target.
  *
  * Phase 4 scope (Option C1):
- * - Empty alt text (no caption extraction).
+ * - Alt text comes from the pic's own hp:caption (see `caption()`).
  * - No width/height attributes.
  * - Resolves both the current `<hc:img binaryItemIDRef="...">` form and the
  *   older `<hp:img binItemIDRef="...">` form. Either populates `.binItemId`.
@@ -33,10 +33,14 @@ class ImageNode {
     binItemId;
     href;
     fixtureBasename;
-    constructor(binItemId, href, fixtureBasename) {
+    node;
+    constructor(binItemId, href, fixtureBasename, 
+    /** Retained so `caption()` can be read lazily, at markdown time. */
+    node) {
         this.binItemId = binItemId;
         this.href = href;
         this.fixtureBasename = fixtureBasename;
+        this.node = node;
     }
     static from(node, binItems, fixtureBasename) {
         // Use plain descendant XPath then filter in TS, rather than an XPath
@@ -50,7 +54,7 @@ class ImageNode {
             hpImg?.getAttribute("binItemIDRef") ??
             null;
         const href = id ? (binItems.get(id)?.href ?? null) : null;
-        return new ImageNode(id, href, fixtureBasename);
+        return new ImageNode(id, href, fixtureBasename, node);
     }
     /**
      * Returns the canonical asset filename: `<fixture>-<binItemId>.<ext>`.
@@ -62,11 +66,45 @@ class ImageNode {
         const ext = this.href.split(".").pop() ?? "";
         return `${this.fixtureBasename}-${this.binItemId}.${ext}`;
     }
+    /**
+     * The pic's caption, which is this image's alt text — and NOT part of the
+     * prose of the paragraph the image sits in. It lives at
+     * `hp:pic > hp:caption > hp:subList > hp:p > hp:run > hp:t`, which every
+     * descendant-axis query in `Paragraph` and `TextRun` used to reach; see the
+     * `not(ancestor::hp:pic)` scoping there for the other half of this.
+     *
+     * EVERY `hp:t`, joined, not just the first. The Ruby gem took `at_xpath`, and
+     * that is indistinguishable from correct across all 11 captions in the
+     * reference book only because the extra nodes are whitespace — a caption
+     * split across two styled runs silently loses everything after the first.
+     *
+     * Returns "" rather than null for an absent or whitespace-only caption, so
+     * callers interpolate it directly.
+     */
+    caption() {
+        return (0, xml_1.findAll)(this.node, ".//hp:caption//hp:t")
+            .map(t => t.textContent ?? "")
+            .join("")
+            .trim();
+    }
+    /**
+     * For the HTML span-table fallback, where raw markdown inside a <td> does not
+     * render. Alt is `caption || "image"`, matching the gem's ImageNode#to_html —
+     * NOT alt="". Neither ch07 table spans, so no fixture reaches this path and
+     * cross-check cannot catch a divergence here.
+     */
+    toHtml() {
+        const filename = this.assetFilename();
+        if (!filename)
+            return "";
+        const alt = this.caption() || "image";
+        return `<img src="${this.fixtureBasename}.assets/${filename}" alt="${alt}">`;
+    }
     toMarkdown() {
         const filename = this.assetFilename();
         if (!filename)
             return "";
-        return `![](${this.fixtureBasename}.assets/${filename})`;
+        return `![${this.caption()}](${this.fixtureBasename}.assets/${filename})`;
     }
 }
 exports.ImageNode = ImageNode;

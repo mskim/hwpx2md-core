@@ -1,3 +1,5 @@
+import type { BinItemTable } from "../ingest/bin_items";
+import { ImageNode } from "./image_node";
 /**
  * Wraps an hp:tc element. Phase 3 emits plain text only — no inline styling,
  * no line breaks, no nested tables (if a cell's paragraph contains another
@@ -14,8 +16,15 @@ export declare class TableCell {
     private readonly _rowSpan;
     readonly colAddr: number;
     readonly rowAddr: number;
+    /** Pics living in THIS cell. The paragraph owns only the free ones. */
+    readonly images: ImageNode[];
     private constructor();
-    static from(node: Element): TableCell;
+    /**
+     * `binItems` and `fixtureBasename` are OPTIONAL, and must stay that way: the
+     * container unit tests call TableCell.from / TableRow.from / Table.from
+     * directly with the original arity.
+     */
+    static from(node: Element, binItems?: BinItemTable, fixtureBasename?: string): TableCell;
     get colSpan(): number;
     get rowSpan(): number;
     get merged(): boolean;

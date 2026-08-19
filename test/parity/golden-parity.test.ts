@@ -44,7 +44,7 @@ function bufferManifest(assets: Array<{ relativePath: string; content: Buffer }>
  *
  * Raise it when the shared spec grows. Never lower it to make a run pass.
  */
-const MIN_FIXTURES = 15;
+const MIN_FIXTURES = 18;
 
 const fixtures = fs.existsSync(FIXTURES_DIR)
   ? fs.readdirSync(FIXTURES_DIR).filter((f) => f.endsWith(".hwpx")).sort()

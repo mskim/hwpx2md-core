@@ -19,11 +19,21 @@ describe("TextRun", () => {
     expect(run.text).toBe("hello");
   });
 
-  it("joins multiple hp:t children with a newline (Ruby parity)", () => {
+  // Hancom splits a run at styling and language boundaries, mid-word: the
+  // reference manuscript has "우리나" + "라는", one word in two hp:t. This
+  // previously joined with "\n" and called it "Ruby parity" — the gem's
+  // TextRun#to_s does that, but its document walker never calls it and
+  // concatenates directly instead.
+  it("joins multiple hp:t children with NOTHING, never a newline", () => {
     const run = TextRun.from(
       parseRun(`<hp:t>first</hp:t><hp:t>second</hp:t>`),
     );
-    expect(run.text).toBe("first\nsecond");
+    expect(run.text).toBe("firstsecond");
+  });
+
+  it("does not break a word split across two hp:t", () => {
+    const run = TextRun.from(parseRun(`<hp:t>우리나</hp:t><hp:t>라는</hp:t>`));
+    expect(run.text).toBe("우리나라는");
   });
 
   it("returns empty string for a run with no hp:t children", () => {
@@ -89,5 +99,23 @@ describe("TextRun", () => {
     const table = new Map([["7", { bold: true, italic: true, underline: true, strikethrough: false, supscript: false, subscript: false }]]);
     const run = TextRun.from(doc.documentElement, table);
     expect(run.toMarkdown()).toBe("");
+  });
+
+  // An hp:pic carries its caption at hp:pic > hp:caption > hp:subList > hp:p >
+  // hp:run > hp:t. `.//hp:t` reaches it, which splices the caption into the
+  // middle of the sentence the image sits beside:
+  //   "…훌륭한 우리나" + "이 태 섭" + "라는 고조선(古朝鮮)에 이어…"
+  // Caption text belongs to the image, as alt text, and nowhere else.
+  it("does not descend into an hp:pic caption", () => {
+    const run = TextRun.from(
+      parseRun(
+        `<hp:t>대한민국은 우리나</hp:t>` +
+          `<hp:pic><hp:caption><hp:subList><hp:p><hp:run><hp:t>이 태 섭</hp:t></hp:run></hp:p></hp:subList></hp:caption></hp:pic>` +
+          `<hp:t>라는 고조선에 이어</hp:t>`,
+      ),
+    );
+    // Both fixes together: the caption is gone AND the word it was wedged
+    // into is whole again.
+    expect(run.text).toBe("대한민국은 우리나라는 고조선에 이어");
   });
 });

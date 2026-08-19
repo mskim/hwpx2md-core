@@ -5,6 +5,14 @@
 #   1. Ruby output != golden (Ruby drifted from spec)
 #   2. TS output != golden (TS drifted from spec)
 #   3. Ruby output != TS output (both drifted in different directions)
+#   4. Ruby assets != TS assets (one side links an image it never writes)
+#
+# Mode 4 was missing for the whole life of this script: both assets directories
+# were written and neither was ever read. That is not a theoretical gap. When
+# table cells learned to hold images, the TypeScript side emitted 94 plate
+# references while extracting none of them, because its collector walked only
+# the paragraph's free pics — markdown pointing at files that do not exist. The
+# markdown diff is identical in that state, so modes 1-3 all pass.
 #
 # Usage:
 #   ./scripts/cross-check.sh
@@ -96,6 +104,27 @@ for fixture in "${fixtures[@]}"; do
     diff -u "$ruby_out" "$ts_out" | head -20 >&2 || true
     failures=$((failures + 1))
   fi
+
+  # Compare what each side actually WROTE, by name and by bytes. `diff -r`
+  # reports files present on one side only, which is the case that matters:
+  # markdown that links an asset nobody extracted.
+  if ! diff -r -q "$ruby_assets" "$ts_assets" > /dev/null 2>&1; then
+    echo "FAIL [$name]: Ruby assets != TS assets" >&2
+    diff -r -q "$ruby_assets" "$ts_assets" 2>&1 | head -20 >&2 || true
+    failures=$((failures + 1))
+  fi
+
+  # Every image the markdown points at must exist on disk. Catches the case
+  # where BOTH sides are wrong in the same way, which no diff between them can.
+  while IFS= read -r target; do
+    case "$target" in
+      *://*) continue ;;   # external URL, not ours to extract
+    esac
+    if [ ! -e "$ts_assets/$(basename "$target")" ]; then
+      echo "FAIL [$name]: markdown links '$target' but no such asset was written" >&2
+      failures=$((failures + 1))
+    fi
+  done < <(grep -o '!\[[^]]*\]([^)]*)' "$ts_out" 2>/dev/null | sed -E 's/.*\((.*)\)/\1/' | sort -u)
 done
 
 if [ $failures -eq 0 ]; then

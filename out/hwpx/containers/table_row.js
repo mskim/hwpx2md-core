@@ -17,9 +17,13 @@ class TableRow {
     constructor(cells) {
         this.cells = cells;
     }
-    static from(node) {
+    static from(node, binItems, fixtureBasename) {
         const cellNodes = (0, xml_1.findAll)(node, "hp:tc");
-        return new TableRow(cellNodes.map(c => table_cell_1.TableCell.from(c)));
+        return new TableRow(cellNodes.map(c => table_cell_1.TableCell.from(c, binItems, fixtureBasename)));
+    }
+    /** Every image held by this row's cells, for the document's asset manifest. */
+    images() {
+        return this.cells.flatMap(c => c.images);
     }
     /**
      * Returns cells excluding those absorbed by another cell's span.

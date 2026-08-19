@@ -110,7 +110,7 @@ class Document {
                 // Reset numbered counters when we hit a bullet
                 prevLevel = -1;
                 Object.keys(counters).forEach(k => delete counters[Number(k)]);
-                return `${indent}- ${entry.text}`;
+                return withImagePrefix(entry.imagePrefix, `${indent}- ${entry.text}`);
             }
             if (entry.type === "numbered_item") {
                 const level = entry.level;
@@ -127,7 +127,7 @@ class Document {
                 }
                 prevLevel = level;
                 const indent = "  ".repeat(level);
-                return `${indent}${counters[level]}. ${entry.text}`;
+                return withImagePrefix(entry.imagePrefix, `${indent}${counters[level]}. ${entry.text}`);
             }
             return "";
         });
@@ -175,11 +175,23 @@ class Document {
     }
 }
 exports.Document = Document;
+/**
+ * A list item's free pics go ABOVE the item, matching the gem, which pushes the
+ * image as its own `content` entry and then the sentinel.
+ *
+ * GUARDED, not interpolated. `${entry.imagePrefix}` on a sentinel without one
+ * renders the string "undefined" into every bullet in the corpus.
+ */
+function withImagePrefix(prefix, line) {
+    return prefix ? `${prefix}\n\n${line}` : line;
+}
 function collectImageAssets(paragraphs, entries, fixtureBasename) {
     const seen = new Set();
     const assets = [];
     for (const p of paragraphs) {
-        for (const img of p.images) {
+        // allImages(), NOT images: the latter is free pics only, and a plate living
+        // in a table cell would otherwise be linked but never written.
+        for (const img of p.allImages()) {
             if (!img.href || seen.has(img.href))
                 continue;
             const buffer = entries.get(img.href);

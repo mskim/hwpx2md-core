@@ -21,9 +21,20 @@ class Table {
     constructor(rows) {
         this.rows = rows;
     }
-    static from(node) {
+    static from(node, binItems, fixtureBasename) {
         const trNodes = (0, xml_1.findAll)(node, "hp:tr");
-        return new Table(trNodes.map(tr => table_row_1.TableRow.from(tr)));
+        return new Table(trNodes.map(tr => table_row_1.TableRow.from(tr, binItems, fixtureBasename)));
+    }
+    /**
+     * Every image held by this table's cells.
+     *
+     * `Paragraph.images` is FREE pics only, and `collectImageAssets` walks it —
+     * so without this route the markdown would link plate files that are never
+     * written. The gem does not have this problem: its image extractor walks
+     * //hp:pic document-wide, which is why the port is the side that would go red.
+     */
+    images() {
+        return this.rows.flatMap(r => r.images());
     }
     /** Returns true if any cell has colSpan>1 or rowSpan>1. */
     hasSpans() {
