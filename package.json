@@ -1,6 +1,6 @@
 {
   "name": "hwpx2md-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "OWPML/HWPX to Markdown converter. One parser, two shells.",
   "license": "MIT",
   "repository": {
