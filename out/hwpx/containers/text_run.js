@@ -33,7 +33,7 @@ class TextRun {
         // sentence the image sits beside:
         //   "…훌륭한 우리나" + "이 태 섭" + "라는 고조선(古朝鮮)에 이어…"
         // Caption text is the image's alt text (ImageNode.caption()) and nothing else.
-        const textNodes = (0, xml_1.findAll)(node, ".//hp:t[not(ancestor::hp:pic)]");
+        const textNodes = (0, xml_1.findAll)(node, ".//hp:t[not(ancestor::hp:pic) and not(ancestor::hp:endNote) and not(ancestor::hp:footNote)]");
         const ref = node.getAttribute("charPrIDRef") ?? "";
         const style = (charPrTable && charPrTable.get(ref)) ?? NO_STYLE;
         return new TextRun(textNodes.map(t => text_1.Text.from(t)), style);

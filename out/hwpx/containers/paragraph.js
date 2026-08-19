@@ -37,6 +37,22 @@ const NOT_IN_PIC = "[not(ancestor::hp:pic)]";
 /** A pic under a table cell belongs to the cell, not to this paragraph. */
 const NOT_IN_CELL = "[not(ancestor::hp:tc)]";
 /**
+ * Excludes anything living inside a note attached to this paragraph.
+ *
+ * An hp:endNote or hp:footNote hanging off a paragraph is a SEPARATE body — in a
+ * 수능 exam paper it holds the item's answer and worked solution, with its own
+ * tables and figures. A descendant axis reaches into it, so without this scope:
+ *
+ *   - a stem whose endnote contains a sign table became a TABLE paragraph and
+ *     its own text was discarded. Four stems per paper, measured.
+ *   - every endnote figure was emitted as an image prefix on the stem, and
+ *     counted as the paragraph's own: 39 of one file's 41 images.
+ *
+ * Same shape as the caption and plate defects — the query reaching content that
+ * belongs to something else.
+ */
+const NOT_IN_NOTE = "[not(ancestor::hp:endNote) and not(ancestor::hp:footNote)]";
+/**
  * Body text excludes both a pic's caption and anything inside a table.
  *
  * The hp:tbl half is a GUARD, not a fix for an observed failure: the heading
@@ -46,7 +62,7 @@ const NOT_IN_CELL = "[not(ancestor::hp:tc)]";
  * reference book has that shape today — which is the argument for the guard,
  * not against it.
  */
-const NOT_IN_PIC_OR_TBL = "[not(ancestor::hp:pic) and not(ancestor::hp:tbl)]";
+const NOT_IN_PIC_OR_TBL = "[not(ancestor::hp:pic) and not(ancestor::hp:tbl) and not(ancestor::hp:endNote) and not(ancestor::hp:footNote)]";
 class Paragraph {
     textRuns;
     table;
@@ -77,13 +93,13 @@ class Paragraph {
         const paraPrId = node.getAttribute("paraPrIDRef");
         // Resolved ONCE, ahead of the branch, because every branch carries them now.
         const images = binItems
-            ? (0, xml_1.findAll)(node, `.//hp:pic${NOT_IN_CELL}`).map(p => image_node_1.ImageNode.from(p, binItems, fixtureBasename ?? ""))
+            ? (0, xml_1.findAll)(node, `.//hp:pic${NOT_IN_CELL}${NOT_IN_NOTE}`).map(p => image_node_1.ImageNode.from(p, binItems, fixtureBasename ?? ""))
             : [];
-        const tableNodes = (0, xml_1.findAll)(node, ".//hp:tbl");
+        const tableNodes = (0, xml_1.findAll)(node, `.//hp:tbl${NOT_IN_NOTE}`);
         if (tableNodes.length > 0) {
             return new Paragraph([], table_1.Table.from(tableNodes[0], binItems, fixtureBasename), images, [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null);
         }
-        const eqNodes = (0, xml_1.findAll)(node, ".//hp:equation");
+        const eqNodes = (0, xml_1.findAll)(node, `.//hp:equation${NOT_IN_NOTE}`);
         if (eqNodes.length > 0) {
             return new Paragraph([], null, images, eqNodes.map(e => math_node_1.MathNode.from(e)), styleId, styleTable ?? null, paraPrId, headerDoc ?? null, node, charPrTable ?? null, footnoteQueue ?? null);
         }

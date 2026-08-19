@@ -236,4 +236,54 @@ describe("Paragraph", () => {
       });
     });
   });
+
+  // A paragraph's own content is what it OWNS. An hp:endNote hanging off it is a
+  // separate body — the answer and worked solution of an exam item — and its
+  // tables and figures belong to the note, not to the paragraph.
+  //
+  // Measured on a real 수능 paper before this scope existed: four stems per paper
+  // were REPLACED by their endnote's sign table (the stem text discarded), and 39
+  // of the file's 41 images were attributed to paragraphs, nearly all of them
+  // living inside endnotes. Both are the descendant axis reaching where it should
+  // not, the same shape as the caption and plate defects.
+  describe("endnote content belongs to the endnote", () => {
+    const BIN = new Map([["image1", { href: "BinData/image1.jpg" }]]);
+
+    function withEndnote(inner: string) {
+      const doc = new DOMParser().parseFromString(
+        `<hp:p ${NS} xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core">${inner}</hp:p>`,
+        "application/xml",
+      );
+      return doc.documentElement;
+    }
+
+    const ENDNOTE = (body: string): string =>
+      `<hp:ctrl><hp:endNote number="7"><hp:subList><hp:p><hp:run>${body}` +
+      `</hp:run></hp:p></hp:subList></hp:endNote></hp:ctrl>`;
+
+    it("does not become a table paragraph because its endnote holds a table", () => {
+      const p = Paragraph.from(
+        withEndnote(
+          `<hp:run>${ENDNOTE(`<hp:tbl><hp:tr><hp:tc><hp:subList><hp:p><hp:run>` +
+            `<hp:t>극대</hp:t></hp:run></hp:p></hp:subList></hp:tc></hp:tr></hp:tbl>`)}` +
+            `<hp:t>함수의 극솟값은?</hp:t></hp:run>`,
+        ),
+        undefined, BIN, undefined, undefined, "fx",
+      );
+      expect(p.table).toBeNull();
+      expect(p.toMarkdown()).toBe("함수의 극솟값은?");
+    });
+
+    it("does not claim a figure that lives in its endnote", () => {
+      const p = Paragraph.from(
+        withEndnote(
+          `<hp:run>${ENDNOTE(`<hp:pic><hc:img binaryItemIDRef="image1"/></hp:pic>`)}` +
+            `<hp:t>그림과 같이</hp:t></hp:run>`,
+        ),
+        undefined, BIN, undefined, undefined, "fx",
+      );
+      expect(p.images).toHaveLength(0);
+      expect(p.toMarkdown()).toBe("그림과 같이");
+    });
+  });
 });
