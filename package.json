@@ -3,7 +3,10 @@
   "version": "0.2.0",
   "description": "OWPML/HWPX to Markdown converter. One parser, two shells.",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/mskim/hwpx2md-core.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mskim/hwpx2md-core.git"
+  },
   "main": "./out/index.js",
   "types": "./out/index.d.ts",
   "exports": {
@@ -12,7 +15,12 @@
       "default": "./out/index.js"
     }
   },
-  "files": ["out", "src", "README.md", "LICENSE"],
+  "files": [
+    "out",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "clean": "rm -rf out",
     "compile": "tsc -p .",
@@ -22,7 +30,8 @@
     "test:parity": "vitest run test/parity/",
     "parity:update-spec": "bash scripts/update-spec.sh",
     "fixtures:regen": "bash scripts/regen-fixtures.sh",
-    "cross-check": "bash scripts/cross-check.sh"
+    "cross-check": "bash scripts/cross-check.sh",
+    "exam:acceptance": "node scripts/exam-acceptance.mjs"
   },
   "dependencies": {
     "@xmldom/xmldom": "^0.8.13",
