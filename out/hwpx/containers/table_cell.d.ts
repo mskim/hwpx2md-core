@@ -1,15 +1,5 @@
 import type { BinItemTable } from "../ingest/bin_items";
 import { ImageNode } from "./image_node";
-/**
- * Wraps an hp:tc element. Phase 3 emits plain text only — no inline styling,
- * no line breaks, no nested tables (if a cell's paragraph contains another
- * hp:tbl, its text descendants are flattened into the cell text).
- *
- * Mirrors Ruby's TableCell#to_markdown: concatenate hp:t text, strip, escape
- * pipe characters, substitute &nbsp; when empty.
- *
- * Also supports HTML emission for span tables (Task 8).
- */
 export declare class TableCell {
     private readonly _rawText;
     private readonly _colSpan;

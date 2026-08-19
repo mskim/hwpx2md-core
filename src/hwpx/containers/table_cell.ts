@@ -3,6 +3,7 @@
 import type { BinItemTable } from "../ingest/bin_items";
 import { findAll } from "../ingest/xml";
 import { ImageNode } from "./image_node";
+import { MathNode } from "./math_node";
 
 /** A pic's caption is its alt text, not text of the cell that holds it. */
 const NOT_IN_PIC = "[not(ancestor::hp:pic)]";
@@ -17,6 +18,30 @@ const NOT_IN_PIC = "[not(ancestor::hp:pic)]";
  *
  * Also supports HTML emission for span tables (Task 8).
  */
+/**
+ * A cell's content in document order — text AND equations.
+ *
+ * This used to harvest `.//hp:t` alone, so an equation inside a cell simply
+ * vanished. In a 수능 exam paper the first item's stem lives in the masthead
+ * table cell, so item 1 emitted `<td></td>` — an entire question lost. Same
+ * shape as the caption and plate defects: collect one node type, silently drop
+ * everything else that carries meaning.
+ *
+ * Walks runs rather than using a descendant `hp:t` query, because interleaving
+ * is the whole point: "함수" + eq + "의 값은?" must come back in that order.
+ */
+function renderCellParagraph(scope: Element): string {
+  let out = "";
+  for (const run of findAll(scope, `.//hp:run${NOT_IN_PIC}`)) {
+    for (const child of Array.from(run.childNodes) as Element[]) {
+      if (child.nodeType !== 1) continue;
+      if (child.localName === "t") out += child.textContent ?? "";
+      else if (child.localName === "equation") out += MathNode.from(child).toMarkdown();
+    }
+  }
+  return out;
+}
+
 export class TableCell {
   private constructor(
     private readonly _rawText: string,
@@ -39,15 +64,11 @@ export class TableCell {
     let joined: string;
     if (paragraphNodes.length > 0) {
       const paraTexts = paragraphNodes
-        .map(p => {
-          const ts = findAll(p, `.//hp:t${NOT_IN_PIC}`);
-          return ts.map(t => t.textContent ?? "").join("").trim();
-        })
+        .map(p => renderCellParagraph(p).trim())
         .filter(s => s !== "");
       joined = paraTexts.join(" ");
     } else {
-      const texts = findAll(node, `.//hp:t${NOT_IN_PIC}`);
-      joined = texts.map(t => t.textContent ?? "").join("");
+      joined = renderCellParagraph(node);
     }
 
     const images = binItems

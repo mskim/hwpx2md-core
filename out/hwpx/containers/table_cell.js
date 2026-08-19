@@ -4,6 +4,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TableCell = void 0;
 const xml_1 = require("../ingest/xml");
 const image_node_1 = require("./image_node");
+const math_node_1 = require("./math_node");
 /** A pic's caption is its alt text, not text of the cell that holds it. */
 const NOT_IN_PIC = "[not(ancestor::hp:pic)]";
 /**
@@ -16,6 +17,32 @@ const NOT_IN_PIC = "[not(ancestor::hp:pic)]";
  *
  * Also supports HTML emission for span tables (Task 8).
  */
+/**
+ * A cell's content in document order — text AND equations.
+ *
+ * This used to harvest `.//hp:t` alone, so an equation inside a cell simply
+ * vanished. In a 수능 exam paper the first item's stem lives in the masthead
+ * table cell, so item 1 emitted `<td></td>` — an entire question lost. Same
+ * shape as the caption and plate defects: collect one node type, silently drop
+ * everything else that carries meaning.
+ *
+ * Walks runs rather than using a descendant `hp:t` query, because interleaving
+ * is the whole point: "함수" + eq + "의 값은?" must come back in that order.
+ */
+function renderCellParagraph(scope) {
+    let out = "";
+    for (const run of (0, xml_1.findAll)(scope, `.//hp:run${NOT_IN_PIC}`)) {
+        for (const child of Array.from(run.childNodes)) {
+            if (child.nodeType !== 1)
+                continue;
+            if (child.localName === "t")
+                out += child.textContent ?? "";
+            else if (child.localName === "equation")
+                out += math_node_1.MathNode.from(child).toMarkdown();
+        }
+    }
+    return out;
+}
 class TableCell {
     _rawText;
     _colSpan;
@@ -44,16 +71,12 @@ class TableCell {
         let joined;
         if (paragraphNodes.length > 0) {
             const paraTexts = paragraphNodes
-                .map(p => {
-                const ts = (0, xml_1.findAll)(p, `.//hp:t${NOT_IN_PIC}`);
-                return ts.map(t => t.textContent ?? "").join("").trim();
-            })
+                .map(p => renderCellParagraph(p).trim())
                 .filter(s => s !== "");
             joined = paraTexts.join(" ");
         }
         else {
-            const texts = (0, xml_1.findAll)(node, `.//hp:t${NOT_IN_PIC}`);
-            joined = texts.map(t => t.textContent ?? "").join("");
+            joined = renderCellParagraph(node);
         }
         const images = binItems
             ? (0, xml_1.findAll)(node, ".//hp:pic").map(p => image_node_1.ImageNode.from(p, binItems, fixtureBasename ?? ""))

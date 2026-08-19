@@ -141,4 +141,44 @@ describe("TableCell", () => {
       expect(c.images).toHaveLength(0);
     });
   });
+
+  // A cell harvested .//hp:t and nothing else, so an equation inside it vanished.
+  // In a 수능 paper the first item's stem lives in the masthead table cell, so
+  // item 1 emitted <td></td> — a whole question lost to the same shape as the
+  // caption and plate defects: collect one node type, silently drop the rest.
+  describe("equations inside a cell", () => {
+    function cell(inner: string) {
+      const doc = new DOMParser().parseFromString(
+        `<hp:tc ${NS}>${inner}</hp:tc>`,
+        "application/xml",
+      );
+      return doc.documentElement;
+    }
+
+    it("renders an equation between the text around it", () => {
+      const c = TableCell.from(
+        cell(
+          `<hp:subList><hp:p><hp:run>` +
+            `<hp:t>함수</hp:t>` +
+            `<hp:equation><hp:script>f(x)=2x ^{2} +5</hp:script></hp:equation>` +
+            `<hp:t>의 값은?</hp:t>` +
+          `</hp:run></hp:p></hp:subList>`,
+        ),
+      );
+      expect(c.toMarkdown()).toContain("$$");
+      // No added separator — concatenation in document order, matching how
+      // renderWithInlineEquations already joins text and inline equations.
+      expect(c.toMarkdown()).toBe("함수$$f(x)=2x ^ {2} +5$$의 값은?");
+    });
+
+    it("renders a cell whose only content is an equation", () => {
+      const c = TableCell.from(
+        cell(`<hp:subList><hp:p><hp:run>` +
+          `<hp:equation><hp:script>x ^{2}</hp:script></hp:equation>` +
+          `</hp:run></hp:p></hp:subList>`),
+      );
+      expect(c.toMarkdown()).not.toBe("&nbsp;");
+      expect(c.toMarkdown()).toContain("$$");
+    });
+  });
 });
