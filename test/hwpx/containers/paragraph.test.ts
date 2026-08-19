@@ -286,4 +286,24 @@ describe("Paragraph", () => {
       expect(p.toMarkdown()).toBe("그림과 같이");
     });
   });
+
+  // The table branch passed textRuns: [], so a paragraph holding BOTH a table and
+  // its own prose emitted only the table. In a 수능 paper item 1's stem sits at
+  // paragraph level beside the masthead table — an entire question discarded.
+  //
+  // The spec called this an accepted limit ("G1 stays false for table
+  // paragraphs"). On real exam papers it is not a limit, it is silent data loss,
+  // and it is the same shape as the pic branch eating the text.
+  it("keeps a table paragraph's own text, after the table", () => {
+    const p = Paragraph.from(
+      parseParagraph(
+        `<hp:run><hp:tbl><hp:tr><hp:tc><hp:subList><hp:p><hp:run>` +
+          `<hp:t>머리말</hp:t></hp:run></hp:p></hp:subList></hp:tc></hp:tr></hp:tbl></hp:run>` +
+          `<hp:run><hp:t>의 값은?</hp:t></hp:run>`,
+      ),
+    );
+    const out = String(p.toMarkdown());
+    expect(out).toContain("머리말");
+    expect(out.trimEnd().endsWith("의 값은?")).toBe(true);
+  });
 });

@@ -35,7 +35,8 @@ export class TextRun {
     // Caption text is the image's alt text (ImageNode.caption()) and nothing else.
     const textNodes = findAll(
       node,
-      ".//hp:t[not(ancestor::hp:pic) and not(ancestor::hp:endNote) and not(ancestor::hp:footNote)]",
+      ".//hp:t[not(ancestor::hp:pic) and not(ancestor::hp:tbl)" +
+        " and not(ancestor::hp:endNote) and not(ancestor::hp:footNote)]",
     );
     const ref = node.getAttribute("charPrIDRef") ?? "";
     const style = (charPrTable && charPrTable.get(ref)) ?? NO_STYLE;

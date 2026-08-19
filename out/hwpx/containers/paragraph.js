@@ -95,9 +95,13 @@ class Paragraph {
         const images = binItems
             ? (0, xml_1.findAll)(node, `.//hp:pic${NOT_IN_CELL}${NOT_IN_NOTE}`).map(p => image_node_1.ImageNode.from(p, binItems, fixtureBasename ?? ""))
             : [];
+        // The paragraph's OWN runs — outside any pic, table or note. Resolved here
+        // because the table branch needs them too: a paragraph can hold a table AND
+        // its own prose, and dropping the prose loses whole exam questions.
+        const ownRuns = (0, xml_1.findAll)(node, `.//hp:run${NOT_IN_PIC_OR_TBL}`);
         const tableNodes = (0, xml_1.findAll)(node, `.//hp:tbl${NOT_IN_NOTE}`);
         if (tableNodes.length > 0) {
-            return new Paragraph([], table_1.Table.from(tableNodes[0], binItems, fixtureBasename), images, [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null);
+            return new Paragraph(ownRuns.map(r => text_run_1.TextRun.from(r, charPrTable)), table_1.Table.from(tableNodes[0], binItems, fixtureBasename), images, [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null, node, charPrTable ?? null, footnoteQueue ?? null);
         }
         const eqNodes = (0, xml_1.findAll)(node, `.//hp:equation${NOT_IN_NOTE}`);
         if (eqNodes.length > 0) {
@@ -108,8 +112,7 @@ class Paragraph {
         // caption's own run, emitting the caption a second time at paragraph level;
         // TextRun's matching scope stops it being spliced into the sentence beside
         // it. Both are needed — they remove different halves of the same defect.
-        const runNodes = (0, xml_1.findAll)(node, `.//hp:run${NOT_IN_PIC_OR_TBL}`);
-        return new Paragraph(runNodes.map(r => text_run_1.TextRun.from(r, charPrTable)), null, images, [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null, node, charPrTable ?? null, footnoteQueue ?? null);
+        return new Paragraph(ownRuns.map(r => text_run_1.TextRun.from(r, charPrTable)), null, images, [], styleId, styleTable ?? null, paraPrId, headerDoc ?? null, node, charPrTable ?? null, footnoteQueue ?? null);
     }
     /**
      * Free pics PLUS any held by this paragraph's table cells — everything that
@@ -214,8 +217,13 @@ class Paragraph {
         if (desc?.kind === "numbered") {
             return { type: "numbered_item", level: desc.level, text: this.runTextOnly() };
         }
-        if (this.table)
-            return this.table.toMarkdown();
+        if (this.table) {
+            // Table first, then the paragraph's own prose — document order, since the
+            // table run precedes the text runs in every real case measured.
+            const own = this.textRuns.map(r => r.toMarkdown()).join("").trim();
+            const table = this.table.toMarkdown();
+            return own === "" ? table : `${table}${own}`;
+        }
         if (this.equations.length > 0) {
             // Check if equations are mixed with text in the same run (inline equations)
             if (this._node) {
